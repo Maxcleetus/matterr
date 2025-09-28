@@ -1,0 +1,16 @@
+@import "tailwindcss";
+/* Add this to globals.css or index.css */
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+.animate-gradient {
+  animation: gradientMove 15s ease infinite;
+}
