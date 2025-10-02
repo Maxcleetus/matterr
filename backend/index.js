@@ -7,10 +7,9 @@ import router from "./route.js";
 dotenv.config({ override: true });
 console.log("✅ Loaded env:", process.env.USERNAME, process.env.PASSWORD);
 
-
 const app = express();
 
-// ✅ Body parser must come first
+// ✅ Body parser
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -18,14 +17,17 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 connectDB();
 
 // ✅ CORS configuration
-const allowedOrigins = ["https://matterr-6.onrender.com/", "https://matterr-3.onrender.com/"];
+const allowedOrigins = [
+  "https://matterr-6.onrender.com",
+  "https://matterr-3.onrender.com"
+];
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // allow Postman or server-to-server
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true
+    callback(null, false); // reject other origins
+  }
 }));
 
 // ✅ Routes
