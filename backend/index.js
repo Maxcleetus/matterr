@@ -18,7 +18,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 connectDB();
 
 // ✅ CORS configuration
-const allowedOrigins = ["http://localhost:5173", "http://localhost:5174"];
+const allowedOrigins = ["https://matterr-6.onrender.com/", "https://matterr-3.onrender.com/"];
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
