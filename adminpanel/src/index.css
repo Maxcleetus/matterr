@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes gradientMove {
+  0%   { background-position: 0% 0%; }   /* bottom-left */
+  50%  { background-position: 50% 50%; }   /* top-right */
+  100% { background-position: 0% 0%; }   /* back to bottom-left */
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientMove 15s ease-in-out infinite;
+}

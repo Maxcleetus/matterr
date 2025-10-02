@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 // Card component
 const Card = ({ children, className = "" }) => (
@@ -90,32 +92,21 @@ const Church = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Required fields (marriage optional)
     const requiredFields = [
-      "name",
-      "surname",
-      "parish",
-      "diocese",
-      "dob",
-      "baptism",
-      "confirmation",
-      "occupation",
-      "status",
-      "phone",
-      "father",
-      "mother",
-      "rite",
+      "name", "surname", "parish", "diocese", "dob",
+      "baptism", "confirmation", "occupation", "status",
+      "phone", "father", "mother", "rite"
     ];
 
     for (const field of requiredFields) {
       if (!form[field]) {
-        alert(`${field.charAt(0).toUpperCase() + field.slice(1)} is required`);
+        toast.error(`${field.charAt(0).toUpperCase() + field.slice(1)} is required`);
         return;
       }
     }
 
     if (!form.photo) {
-      alert("Photo is required");
+      toast.error("Photo is required");
       return;
     }
 
@@ -137,10 +128,15 @@ const Church = () => {
 
       const result = await response.json();
       console.log("✅ Success:", result);
-      alert("Form submitted successfully!");
+      toast.success("Form submitted successfully!");
+      setForm({
+        name: "", surname: "", parish: "", diocese: "", dob: "",
+        baptism: "", confirmation: "", marriage: "", occupation: "",
+        status: "", phone: "", father: "", mother: "", rite: "", photo: null
+      });
     } catch (error) {
       console.error("❌ Error submitting form:", error);
-      alert("Failed to submit form.");
+      toast.error("Failed to submit form.");
     } finally {
       setLoading(false);
     }
@@ -148,10 +144,8 @@ const Church = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Animated Gradient Background */}
       <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-black to-gray-800 animate-gradient bg-[length:200%_200%]" />
 
-      {/* Form Card */}
       <Card className="max-w-3xl w-full relative z-10">
         <div className="flex justify-between items-start mb-6">
           <h1 className="text-3xl font-bold text-yellow-400 drop-shadow-lg">
@@ -172,7 +166,6 @@ const Church = () => {
               )}
             </div>
 
-            {/* Hidden file input */}
             <input
               type="file"
               id="photoUpload"
@@ -180,8 +173,6 @@ const Church = () => {
               onChange={handlePhotoUpload}
               className="hidden"
             />
-
-            {/* Custom button */}
             <label
               htmlFor="photoUpload"
               className="mt-3 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white text-sm rounded-md cursor-pointer shadow-md transition"
@@ -214,6 +205,9 @@ const Church = () => {
           </div>
         </form>
       </Card>
+
+      {/* Toast Container */}
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
     </div>
   );
 };
