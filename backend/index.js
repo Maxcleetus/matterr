@@ -18,8 +18,8 @@ connectDB();
 
 // ✅ CORS configuration
 const allowedOrigins = [
-  "https://matterr-6.onrender.com",
-  "https://matterr-3.onrender.com"
+  "http://localhost:5174",
+  "http://localhost:5173"
 ];
 
 app.use(cors({

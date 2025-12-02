@@ -32,7 +32,7 @@ const Dashboard = () => {
       if (!token) return navigate("/");
 
       try {
-        const res = await fetch("https://matterr.onrender.com/api/profile", {
+        const res = await fetch("http://localhost:5000/api/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Unauthorized");

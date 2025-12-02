@@ -11,9 +11,8 @@ export const AllProvider = ({ children }) => {
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      const res = await fetch("https://matterr.onrender.com/api/submissions");
+      const res = await fetch("http://localhost:5000/api/submissions");
       const data = await res.json();
-      console.log("🌐 Fetched submissions:", data);
 
       if (data.success) {
         setSubmissions(data.data); // array from backend

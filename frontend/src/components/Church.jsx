@@ -119,7 +119,7 @@ const Church = () => {
       });
       data.append("photo", form.photo);
 
-      const response = await fetch("https://matterr.onrender.com/api/submit", {
+      const response = await fetch("http://localhost:5000/api/submit", {
         method: "POST",
         body: data,
       });
