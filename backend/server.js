@@ -24,7 +24,7 @@ connectDB();
 const allowedOrigins = [
   "http://localhost:5174",
   "http://localhost:5173",
-  "https://matterr.vercel.app/"
+  "https://matterr.vercel.app"
 ];
 
 app.use(cors({
