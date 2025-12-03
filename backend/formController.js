@@ -1,94 +1,262 @@
+// src/controllers/submissionController.js
+
 import fs from "fs";
 import mongoose from "mongoose";
-import cloudinary from "./cloudinary.js";
-import Submission from "./Submission.js"; // Make sure this points to your Mongoose model
+import cloudinary from "./cloudinary.js"; // Adjust path as necessary
+import Submission from "./Submission.js"; // Adjust path as necessary
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
-/**
- * Handle form submission (with image upload)
- */
-export const submitForm = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: "Photo is required" });
-    }
-
-    // Upload image to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "my_app",
+// --- Utility Function (JWT Token Generation) ---
+const generateToken = (id) => {
+    // Ensure JWT_SECRET is set in your environment variables
+    return jwt.sign({ id }, process.env.JWT_SECRET, {
+        expiresIn: '30d', // Token expires in 30 days
     });
-
-    // Delete temporary local file
-    fs.unlinkSync(req.file.path);
-
-    const formData = {
-      ...req.body,
-      photo: result.secure_url,
-      public_id: result.public_id,
-    };
-
-    // Save to MongoDB
-    const submission = new Submission(formData);
-    await submission.save();
-
-    console.log("📩 New Submission:", submission);
-
-    res.json({
-      success: true,
-      message: "Form submitted successfully",
-      data: submission,
-    });
-  } catch (error) {
-    console.error("❌ Submit Error:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
 };
 
+// -----------------------------------------------------------------------------
+// 1. SIGNUP AND ENROLLMENT
+// -----------------------------------------------------------------------------
+export const signupAndEnroll = async (req, res) => {
+    try {
+        const {
+            name, surname, familyName, email, password, dob, baptism,
+            confirmation, occupation, status, phone, father, rite, role
+            // Optional fields are also in req.body
+        } = req.body;
+
+        // --- 1. Basic Validation ---
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: "Photo file is required for enrollment." });
+        }
+
+        const requiredFields = {
+            name, surname, familyName, email, password, dob, baptism,
+            confirmation, occupation, status, phone, father, rite, role
+        };
+
+        for (const [key, value] of Object.entries(requiredFields)) {
+            if (!value) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({ success: false, error: `Missing required field: ${key}` });
+            }
+        }
+
+        // --- 2. Check if user already exists ---
+        const existingUser = await Submission.findOne({ email });
+        if (existingUser) {
+            fs.unlinkSync(req.file.path);
+            return res.status(409).json({ success: false, message: "Account already exists with this email." });
+        }
+
+        // --- 3. Process Credentials ---
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // --- 4. Upload Image to Cloudinary ---
+        const result = await cloudinary.uploader.upload(req.file.path, {
+            folder: "my_app/enrollments",
+        });
+
+        // --- 5. Delete temporary local file ---
+        fs.unlinkSync(req.file.path);
+
+        // --- 6. Create final data object ---
+        const submissionData = {
+            ...req.body,
+            password: hashedPassword, // Store hashed password
+            photo: result.secure_url,
+            public_id: result.public_id,
+        };
+
+        // --- 7. Save to MongoDB ---
+        const newUser = new Submission(submissionData);
+        await newUser.save();
+
+        console.log("✅ New Enrollment & User Created:", newUser.email);
+
+        // --- 8. Generate Token & Prepare Response Data ---
+        const token = generateToken(newUser._id);
+        const { password: _, public_id: __, ...userData } = newUser.toObject();
+
+        res.status(201).json({
+            success: true,
+            message: "Account created and enrollment submitted successfully.",
+            token,
+            userData,
+        });
+
+    } catch (error) {
+        console.error("❌ Sign Up/Enrollment Error:", error);
+        
+        // Clean up local file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// -----------------------------------------------------------------------------
+// 2. USER LOGIN
+// -----------------------------------------------------------------------------
+export const userLogin = async (req, res) => {
+    const { email, password } = req.body;
+    
+    try {
+        if (!email || !password) {
+            return res.status(400).json({ success: false, message: "Email and password are required." });
+        }
+
+        const user = await Submission.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: "Invalid credentials." });
+        }
+
+        const token = generateToken(user._id);
+        const { password: _, public_id: __, ...userData } = user.toObject();
+
+        res.json({
+            success: true,
+            message: "Login successful!",
+            token,
+            userData
+        });
+        
+    } catch (error) {
+        console.error("❌ Login Error:", error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// -----------------------------------------------------------------------------
+// 3. USER PROFILE UPDATE (NEW)
+// -----------------------------------------------------------------------------
 /**
- * Fetch all submissions
+ * Update user profile details
+ * NOTE: Requires a middleware (like 'protect') to set req.user.id from the JWT token.
+ * It strictly prevents updating sensitive fields like password and email.
  */
+export const userUpdate = async (req, res) => {
+    // Assumes authentication middleware has set req.user.id
+    const userId = req.user?.id; 
+    const updateFields = req.body;
+    
+    try {
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized: Please log in." });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid user ID format." });
+        }
+
+        // --- 1. Filter out sensitive/immutable fields ---
+        const disallowedFields = ['password', 'email', 'familyName', 'photo', 'public_id', '_id', '__v', 'createdAt'];
+        const updateData = {};
+
+        for (const key in updateFields) {
+            if (updateFields.hasOwnProperty(key) && !disallowedFields.includes(key)) {
+                updateData[key] = updateFields[key];
+            }
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ success: false, message: "No valid fields provided for update." });
+        }
+        
+        // --- 2. Update the document in MongoDB ---
+        const updatedUser = await Submission.findByIdAndUpdate(
+            userId,
+            { $set: updateData },
+            // options: { new: true } returns the updated document, runValidators ensures schema validation
+            { new: true, runValidators: true } 
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        // --- 3. Prepare Response Data ---
+        const { password: _, public_id: __, ...userData } = updatedUser.toObject();
+
+        console.log("✅ User Profile Updated:", updatedUser.email);
+        
+        res.json({
+            success: true,
+            message: "Profile updated successfully.",
+            user: userData, // Return the updated clean user data
+        });
+
+    } catch (error) {
+        console.error("❌ Profile Update Error:", error.message);
+        
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({ success: false, message: messages.join(', ') });
+        }
+
+        res.status(500).json({ success: false, message: "Server error during profile update." });
+    }
+};
+
+
+// -----------------------------------------------------------------------------
+// 4. FETCH ALL SUBMISSIONS (Admin)
+// -----------------------------------------------------------------------------
 export const getSubmissions = async (req, res) => {
-  try {
-    const submissions = await Submission.find().sort({ createdAt: -1 });
+    try {
+        // NOTE: You should add an authorization check here to ensure only admins can run this
+        const submissions = await Submission.find().sort({ createdAt: -1 });
 
-    res.json({
-      success: true,
-      count: submissions.length,
-      data: submissions,
-    });
-  } catch (error) {
-    console.error("❌ Fetch Error:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
+        res.json({
+            success: true,
+            count: submissions.length,
+            data: submissions,
+        });
+    } catch (error) {
+        console.error("❌ Fetch Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 };
 
+// -----------------------------------------------------------------------------
+// 5. DELETE SUBMISSION (Admin)
+// -----------------------------------------------------------------------------
 export const deleteSubmission = async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log("Deleting submission with ID:", id);
+    try {
+        const { id } = req.params;
+        console.log("Deleting submission with ID:", id);
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: "Invalid ID" });
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid ID" });
+        }
+
+        const deleted = await Submission.findByIdAndDelete(id);
+        if (!deleted) {
+            return res.status(404).json({ success: false, message: "Submission not found" });
+        }
+
+        // Delete image from Cloudinary after DB deletion
+        if (deleted.public_id) {
+            try {
+                await cloudinary.uploader.destroy(deleted.public_id);
+            } catch (err) {
+                console.error("Cloudinary delete error (non-fatal):", err);
+            }
+        }
+
+        console.log("Deleted document from MongoDB:", deleted._id);
+        res.json({ success: true, message: "Submission deleted successfully" });
+    } catch (error) {
+        console.error("❌ Delete Error:", error);
+        res.status(500).json({ success: false, error: error.message });
     }
-
-    const deleted = await Submission.findByIdAndDelete(id);
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: "Submission not found" });
-    }
-
-    // Delete image from Cloudinary after DB deletion
-    if (deleted.public_id) {
-      try {
-        await cloudinary.uploader.destroy(deleted.public_id);
-      } catch (err) {
-        console.error("Cloudinary delete error:", err);
-      }
-    }
-
-    console.log("Deleted document from MongoDB:", deleted);
-    res.json({ success: true, message: "Submission deleted successfully" });
-  } catch (error) {
-    console.error("❌ Delete Error:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
 };
-

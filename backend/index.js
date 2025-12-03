@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import connectDB from "./mongo.js"; 
 import router from "./route.js";
+import user from './user.js'
 
 dotenv.config({ override: true });
 console.log("✅ Loaded env:", process.env.USERNAME, process.env.PASSWORD);
@@ -32,6 +33,7 @@ app.use(cors({
 
 // ✅ Routes
 app.use("/api", router);
+app.use("/api/user", user);
 
 // ✅ Example route
 app.get("/", (req, res) => res.send("API is running 🚀"));

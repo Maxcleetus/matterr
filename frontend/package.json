@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.13",
+    "gsap": "^3.13.0",
     "react": "^19.1.1",
     "react-datepicker": "^8.7.0",
     "react-dom": "^19.1.1",
+    "react-router-dom": "^7.10.0",
     "react-toastify": "^11.0.5",
     "tailwindcss": "^4.1.13"
   },
