@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import connectDB from "./mongo.js"; 
+import connectDB from "./mongo.js";
 import router from "./route.js";
 import user from './user.js'
 
@@ -39,5 +39,9 @@ app.use("/api/user", user);
 app.get("/", (req, res) => res.send("API is running 🚀"));
 
 // ✅ Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+if (process.env.NODE_ENV != "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}
+
+export default index
