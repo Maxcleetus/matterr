@@ -1,5 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
+import http from 'http';
+import "dotenv/config";
 import cors from "cors";
 import connectDB from "./mongo.js";
 import router from "./route.js";
@@ -9,6 +11,7 @@ dotenv.config({ override: true });
 console.log("✅ Loaded env:", process.env.USERNAME, process.env.PASSWORD);
 
 const app = express();
+const server = http.createServer(app);
 
 // ✅ Body parser
 app.use(express.json({ limit: "50mb" }));
@@ -41,7 +44,7 @@ app.get("/", (req, res) => res.send("API is running 🚀"));
 // ✅ Start server
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 }
 
-export default app
+export default server
