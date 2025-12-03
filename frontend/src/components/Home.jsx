@@ -135,7 +135,7 @@ const getInitialData = () => {
 };
 
 // API base URL
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://jinto-backend.vercel.app/api';
 
 // --- Main Component ---
 const Home = ({ onLogout }) => {

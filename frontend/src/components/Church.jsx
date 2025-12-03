@@ -308,7 +308,7 @@ const Church = ({ onAuthSuccess }) => {
     // ------------------
     
     // --- API Configuration ---
-    const BASE_URL = "http://localhost:5000/api/user";
+    const BASE_URL = "https://jinto-backend.vercel.app/api/user";
     const ENDPOINT = `${BASE_URL}/${mode}`; 
     
     // Data preparation
