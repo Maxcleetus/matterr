@@ -30,7 +30,7 @@ const SubmissionDetails = () => {
     if (found) {
       setSubmission(found);
     } else {
-      fetch(`https://matterr-backend-gut46zazm-maxcleetus-projects.vercel.app/api/submissions/${id}`)
+      fetch(`https://jinto-backend.vercel.app/api/submissions/${id}`)
         .then((res) => res.json())
         .then((data) => setSubmission(data.data))
         .catch(() => navigate("/dashboard"));

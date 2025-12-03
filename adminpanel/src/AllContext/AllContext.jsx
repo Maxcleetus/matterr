@@ -11,7 +11,7 @@ export const AllProvider = ({ children }) => {
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      const res = await fetch("https://matterr-backend-gut46zazm-maxcleetus-projects.vercel.app/api/submissions");
+      const res = await fetch("https://jinto-backend.vercel.app/api/submissions");
       const data = await res.json();
 
       if (data.success) {

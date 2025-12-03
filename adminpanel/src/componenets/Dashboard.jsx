@@ -43,7 +43,7 @@ const Dashboard = () => {
       if (!token) return navigate("/");
 
       try {
-        const res = await fetch("https://matterr-backend-gut46zazm-maxcleetus-projects.vercel.app/api/profile", {
+        const res = await fetch("https://jinto-backend.vercel.app/api/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Unauthorized");
@@ -94,7 +94,7 @@ const Dashboard = () => {
     const token = localStorage.getItem("token");
     try {
       setDeleting(true);
-      const res = await fetch(`https://matterr-backend-gut46zazm-maxcleetus-projects.vercel.app/api/delete/${deleteId}`, {
+      const res = await fetch(`https://jinto-backend.vercel.app/api/delete/${deleteId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

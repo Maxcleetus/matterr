@@ -88,7 +88,7 @@ const Login = () => {
 
     try {
       setLoading(true);
-      const response = await fetch("https://matterr-backend-gut46zazm-maxcleetus-projects.vercel.app/api/login", {
+      const response = await fetch("https://jinto-backend.vercel.app/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: form.username, password: form.password }),
