@@ -12,6 +12,7 @@ console.log("✅ Loaded env:", process.env.USERNAME, process.env.PASSWORD);
 const app = express();
 
 // ✅ Body parser
+app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -20,7 +21,6 @@ connectDB();
 
 // --- ✅ FIX: CORS configuration to allow all origins (*) ---
 // This simplifies the middleware and resolves the "No 'Access-Control-Allow-Origin'" error.
-app.use(cors());
 
 // You can also explicitly use:
 /*
