@@ -24,54 +24,31 @@ const SubmissionDetails = () => {
   const { submissions } = useAllContext();
   const [submission, setSubmission] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
   useEffect(() => {
     const found = submissions.find((s) => s._id === id);
-    const token = localStorage.getItem('token');
-
     if (found) {
       setSubmission(found);
     } else {
-      // Check if token exists before making the request
-      if (!token) {
-        // Redirect to login if no token
-        window.location.href = '/login';
-        return;
-      }
-
       fetch(`https://jinto-backend.vercel.app/api/submissions/${id}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`, // Add this line
           'Content-Type': 'application/json'
         }
       })
         .then((res) => {
-          if (res.status === 401 || res.status === 403) {
+          if (res.status === 401) {
             // Token expired or invalid
             localStorage.removeItem('token');
             localStorage.removeItem('userData');
             window.location.href = '/login';
-            return Promise.reject('Unauthorized');
+            return;
           }
-
-          if (!res.ok) {
-            return Promise.reject(`HTTP error! status: ${res.status}`);
-          }
-
           return res.json();
         })
-        .then((data) => {
-          if (data && data.data) {
-            setSubmission(data.data);
-          } else {
-            console.error('Invalid response format:', data);
-            navigate("/dashboard");
-          }
-        })
-        .catch((error) => {
-          console.error('Fetch error:', error);
-          navigate("/dashboard");
-        });
+        .then((data) => setSubmission(data.data))
+        .catch(() => navigate("/dashboard"));
     }
   }, [id, submissions, navigate]);
 
