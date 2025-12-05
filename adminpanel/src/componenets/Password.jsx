@@ -196,7 +196,7 @@ const Password = () => {
                                 onClick={() => navigate("/dashboard")}
                                 className="text-teal-600 hover:text-teal-700 font-medium text-sm transition"
                             >
-                                ← Back to Login
+                                ← Back
                             </button>
                         </div>
                     </form>
