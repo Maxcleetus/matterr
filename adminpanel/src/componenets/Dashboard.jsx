@@ -7,7 +7,7 @@ import {
 import {
   FaTrash, FaEye, FaChurch, FaUsers, FaUser, FaCalendarAlt,
   FaPhone, FaHome, FaFilter, FaSearch, FaTimes, FaCross,
-  FaToggleOn, FaToggleOff
+  FaToggleOn, FaToggleOff, FaEnvelope
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -267,7 +267,10 @@ const Dashboard = () => {
       const memberMatch = family.members.some(member => {
         const name = member.name || "";
         const surname = member.surname || "";
-        return name.toLowerCase().includes(searchTerm) || surname.toLowerCase().includes(searchTerm);
+        const email = member.email || "";
+        return name.toLowerCase().includes(searchTerm) || 
+               surname.toLowerCase().includes(searchTerm) ||
+               email.toLowerCase().includes(searchTerm);
       });
       return familyNameMatch || memberMatch;
     });
@@ -301,10 +304,12 @@ const Dashboard = () => {
     return filteredSubmissions.filter(person => {
       const name = person.name || "";
       const surname = person.surname || "";
+      const email = person.email || "";
       const phone = person.phone || "";
       const parish = person.parish || "";
       return name.toLowerCase().includes(searchTerm) ||
         surname.toLowerCase().includes(searchTerm) ||
+        email.toLowerCase().includes(searchTerm) ||
         phone.toLowerCase().includes(searchTerm) ||
         parish.toLowerCase().includes(searchTerm);
     });
@@ -438,7 +443,7 @@ const Dashboard = () => {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search by name, phone, parish..."
+                  placeholder="Search by name, email, phone, parish..."
                   value={peopleSearch}
                   onChange={(e) => setPeopleSearch(e.target.value)}
                   className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
@@ -907,6 +912,10 @@ const Dashboard = () => {
                       </div>
                       <div className="mt-3 space-y-1">
                         <div className="flex items-center gap-2 text-sm text-gray-700">
+                          <FaEnvelope className="w-3 h-3" />
+                          <span className="truncate">{s.email || "No email"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
                           <FaPhone className="w-3 h-3" />
                           <span>{s.phone || "No phone"}</span>
                         </div>
@@ -1001,7 +1010,8 @@ const Dashboard = () => {
                             </span>
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {member.phone && `📱 ${member.phone}`}
+                            {member.email && `📧 ${member.email}`}
+                            {member.phone && ` | 📱 ${member.phone}`}
                             {member.parish && ` | ⛪ ${member.parish}`}
                           </div>
                         </div>
@@ -1073,6 +1083,7 @@ const Dashboard = () => {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-2">Personal Information</h3>
                   <div className="space-y-2">
+                    <p className="text-sm"><span className="text-gray-600">Email:</span> {selectedMember.email || "N/A"}</p>
                     <p className="text-sm"><span className="text-gray-600">Date of Birth:</span> {formatDate(selectedMember.dob)}</p>
                     <p className="text-sm"><span className="text-gray-600">Phone:</span> {selectedMember.phone || "N/A"}</p>
                     <p className="text-sm"><span className="text-gray-600">Occupation:</span> {selectedMember.occupation || "N/A"}</p>

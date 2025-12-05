@@ -15,7 +15,8 @@ import {
   FaWater,
   FaStar,
   FaUsers,
-  FaEdit
+  FaEdit,
+  FaEnvelope
 } from "react-icons/fa";
 
 const SubmissionDetails = () => {
@@ -26,6 +27,7 @@ const SubmissionDetails = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     const found = submissions.find((s) => s._id === id);
     if (found) {
       setSubmission(found);
@@ -33,7 +35,7 @@ const SubmissionDetails = () => {
       fetch(`https://jinto-backend.vercel.app/api/submissions/${id}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`, // Add this line
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -89,12 +91,21 @@ const SubmissionDetails = () => {
     </div>
   );
 
-  const DetailItem = ({ icon, label, value, color = "text-gray-700" }) => (
+  const DetailItem = ({ icon, label, value, color = "text-gray-700", link = false }) => (
     <div className="flex items-start gap-3">
       <div className="text-teal-600 mt-1">{icon}</div>
       <div className="flex-1">
         <div className="text-sm text-gray-500">{label}</div>
-        <div className={`font-medium ${color}`}>{value || "N/A"}</div>
+        {link ? (
+          <a 
+            href={`mailto:${value}`} 
+            className={`font-medium ${color} hover:text-teal-600 transition-colors`}
+          >
+            {value || "N/A"}
+          </a>
+        ) : (
+          <div className={`font-medium ${color}`}>{value || "N/A"}</div>
+        )}
       </div>
     </div>
   );
@@ -144,6 +155,17 @@ const SubmissionDetails = () => {
                     <FaMapMarkerAlt className="text-gray-400" />
                     <span className="text-gray-600">{submission.presentPlace || submission.parishOrigin}</span>
                   </div>
+                  {submission.email && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <FaEnvelope className="text-gray-400" />
+                      <a 
+                        href={`mailto:${submission.email}`}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        {submission.email}
+                      </a>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <button
@@ -153,7 +175,6 @@ const SubmissionDetails = () => {
                     <FaArrowLeft className="w-4 h-4" />
                     Back
                   </button>
-
                 </div>
               </div>
 
@@ -172,8 +193,8 @@ const SubmissionDetails = () => {
                   <div className="font-semibold text-gray-900">{submission.marriage ? "Married" : "Single"}</div>
                 </div>
                 <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-3 rounded-lg border border-emerald-100">
-                  <div className="text-sm text-gray-600">Updated</div>
-                  <div className="font-semibold text-gray-900">{formatDate(submission.updatedAt).split(',')[0]}</div>
+                  <div className="text-sm text-gray-600">Contact</div>
+                  <div className="font-semibold text-gray-900">{submission.phone ? "Phone" : submission.email ? "Email" : "No Contact"}</div>
                 </div>
               </div>
             </div>
@@ -189,6 +210,13 @@ const SubmissionDetails = () => {
             title="Personal Information"
             icon={<FaUser className="w-5 h-5 text-teal-600" />}
           >
+            <DetailItem
+              icon={<FaEnvelope />}
+              label="Email Address"
+              value={submission.email}
+              color="text-blue-600"
+              link={true}
+            />
             <DetailItem
               icon={<FaBirthdayCake />}
               label="Date of Birth"
@@ -380,6 +408,12 @@ const SubmissionDetails = () => {
             <div className="text-white text-center mt-4">
               <p className="text-lg font-semibold">{submission.name} {submission.surname}</p>
               <p className="text-gray-300">{submission.familyName}</p>
+              {submission.email && (
+                <p className="text-blue-300 mt-2">
+                  <FaEnvelope className="inline mr-2" />
+                  {submission.email}
+                </p>
+              )}
             </div>
           </div>
         </div>
