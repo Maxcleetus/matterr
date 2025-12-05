@@ -4,6 +4,7 @@ import SubmissionDetails from "./componenets/SubmissionDetails.jsx";
 import Login from "./componenets/Login.jsx";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Password from "./componenets/Password.jsx";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/submission/:id" element={<SubmissionDetails />} />
+        <Route path="/reset" element={<Password/>} />
       </Routes>
       {/* ToastContainer should be outside Routes but inside BrowserRouter */}
       <ToastContainer

@@ -3,8 +3,9 @@ import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary"; // 1. NEW IMPORT
 import cloudinary from "./cloudinary.js"; // 2. NEW IMPORT (Your configuration file)
 
-import { getSubmissions, deleteSubmission, signupAndEnroll } from "./formController.js";
+import { getSubmissions, deleteSubmission, signupAndEnroll, toogle, getToggleState, updatePassword } from "./formController.js";
 import { getProfile, login } from "./LoginControl.js";
+import  { adminProtect, protect } from "./auth.js";
 
 // --- FIX START: Cloudinary Storage ---
 const storage = new CloudinaryStorage({
@@ -29,8 +30,14 @@ router.post("/signup", upload.single("photo"), signupAndEnroll)
 
 router.get("/profile", getProfile);
 
-router.get("/submissions", getSubmissions);
+router.put("/toggle-feature",adminProtect,toogle);
 
-router.delete("/delete/:id", deleteSubmission);
+router.put("/reset",adminProtect,updatePassword);
+
+router.get("/toggle-feature",protect,getToggleState)
+
+router.get("/submissions",adminProtect,getSubmissions);
+
+router.delete("/delete/:id",adminProtect, deleteSubmission);
 
 export default router;

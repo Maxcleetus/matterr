@@ -147,13 +147,53 @@ const Home = ({ onLogout }) => {
     const [editMode, setEditMode] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [userId, setUserId] = useState(null);
+    const [istoggle, setIstoogle] = useState(false);
+
+    useEffect(() => {
+        const fetchToggleState = async () => {
+            
+            const token = localStorage.getItem('userToken')
+
+            try {
+                // Make a GET request
+                const response = await fetch('https://jinto-backend.vercel.app/api/toggle-feature', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`, // <-- ADD THIS LINE
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Check the response structure and update state
+                if (data.success && typeof data.currentToggleState === 'boolean') {
+                    setIstoogle(data.currentToggleState);
+                    console.log(`Initial toggle state loaded: ${data.currentToggleState}`);
+                } else {
+                    console.error("API response missing 'currentToggleState'.");
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch initial toggle state:", error);
+                // Optionally set state to a fallback value or show a toast error
+            }
+        };
+
+        fetchToggleState();
+        // Empty dependency array [] means this runs only once after the initial render
+    }, []);
 
     // Sync on initial load
     useEffect(() => {
         const initialData = getInitialData();
         setProfileData(initialData);
         setEditForm(initialData);
-        
+
         // Get user ID from localStorage or profile data
         const storedUserId = localStorage.getItem('userId') || initialData._id;
         if (storedUserId) {
@@ -251,7 +291,7 @@ const Home = ({ onLogout }) => {
             // 3. Save to Database
             toast.info("Saving to database...");
             const dbResult = await saveToDatabase(dataToSend);
-            
+
             // 4. Update local data with server response (in case server made changes)
             if (dbResult.user) {
                 const serverData = {
@@ -259,10 +299,10 @@ const Home = ({ onLogout }) => {
                     ...dbResult.user,
                     updatedAt: dbResult.user.updatedAt || updatedData.updatedAt
                 };
-                
+
                 setProfileData(serverData);
                 localStorage.setItem('userData', JSON.stringify(serverData));
-                
+
                 // Update userId if server returned it
                 if (dbResult.user._id) {
                     setUserId(dbResult.user._id);
@@ -272,10 +312,10 @@ const Home = ({ onLogout }) => {
 
             toast.success("Profile updated successfully! (Saved to database)");
             setEditMode(false);
-            
+
         } catch (error) {
             console.error("Save error:", error);
-            
+
             // Show appropriate error message
             if (error.message.includes('authentication') || error.message.includes('token')) {
                 toast.error("Session expired. Please login again.");
@@ -342,7 +382,7 @@ const Home = ({ onLogout }) => {
                     <div className="flex space-x-3 self-start sm:self-center">
                         {!editMode ? (
                             <>
-                                <button
+                                {istoggle && <button
                                     type="button"
                                     onClick={toggleEditMode}
                                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition shadow-md flex items-center text-sm"
@@ -351,7 +391,7 @@ const Home = ({ onLogout }) => {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H10v-1.828l8.586-8.586z" />
                                     </svg>
                                     Edit Profile
-                                </button>
+                                </button>}
                                 <button
                                     type="button"
                                     onClick={onLogout}

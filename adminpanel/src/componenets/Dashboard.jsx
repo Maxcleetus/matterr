@@ -4,9 +4,10 @@ import { useAllContext } from "../AllContext/AllContext.jsx";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from "recharts";
-import { 
-  FaTrash, FaEye, FaChurch, FaUsers, FaUser, FaCalendarAlt, 
-  FaPhone, FaHome, FaFilter, FaSearch, FaTimes, FaCross 
+import {
+  FaTrash, FaEye, FaChurch, FaUsers, FaUser, FaCalendarAlt,
+  FaPhone, FaHome, FaFilter, FaSearch, FaTimes, FaCross,
+  FaToggleOn, FaToggleOff
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -23,6 +24,53 @@ const Dashboard = () => {
   const [peopleSearch, setPeopleSearch] = useState("");
   const [showMemberDetails, setShowMemberDetails] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [enableFeature, setEnableFeature] = useState(false);
+
+  useEffect(() => {
+    const fetchToggleState = async () => {
+      const endpoint = "https://jinto-backend.vercel.app/api/toggle-feature";
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        console.error("Authentication token is missing. Cannot fetch feature state.");
+        // Handle unauthorized state, e.g., redirect to login or set error state
+        throw new Error("Missing authentication token.");
+      }
+
+      try {
+        // Make a GET request
+        const response = await fetch('https://jinto-backend.vercel.app/api/toggle-feature', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`, // <-- ADD THIS LINE
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Check the response structure and update state
+        if (data.success && typeof data.currentToggleState === 'boolean') {
+          setEnableFeature(data.currentToggleState);
+          console.log(`Initial toggle state loaded: ${data.currentToggleState}`);
+        } else {
+          console.error("API response missing 'currentToggleState'.");
+        }
+
+      } catch (error) {
+        console.error("Failed to fetch initial toggle state:", error);
+        // Optionally set state to a fallback value or show a toast error
+      }
+    };
+
+    fetchToggleState();
+    // Empty dependency array [] means this runs only once after the initial render
+  }, []);
+
 
   const [stats, setStats] = useState({
     total: 0,
@@ -40,10 +88,10 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       const token = localStorage.getItem("token");
-      if (!token) return navigate("/");
+      if (!token) return navigate("/login");
 
       try {
-        const res = await fetch("https://jinto-backend.vercel.app/api/profile", {
+        const res = await fetch("http://localhost:5000/api/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Unauthorized");
@@ -51,6 +99,11 @@ const Dashboard = () => {
         const data = await res.json();
         setUser(data.user);
         await fetchSubmissions();
+
+        const savedToggleState = localStorage.getItem("dashboardFeatureToggle");
+        if (savedToggleState !== null) {
+          setEnableFeature(JSON.parse(savedToggleState));
+        }
       } catch (err) {
         console.error(err);
         localStorage.removeItem("token");
@@ -59,6 +112,63 @@ const Dashboard = () => {
     };
     fetchProfile();
   }, [navigate]);
+
+  useEffect(() => {
+    localStorage.setItem("dashboardFeatureToggle", JSON.stringify(enableFeature));
+  }, [enableFeature]);
+
+  const handleToggleFeature = async () => {
+    const newState = !enableFeature;
+    const endpoint = "https://jinto-backend.vercel.app/api/toggle-feature"; // Replace with your actual backend endpoint
+    const token = localStorage.getItem('token');
+    setEnableFeature(newState); // Optimistically update the UI state
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'PUT', // Or 'PUT', depending on your API
+        headers: {
+          'Authorization': `Bearer ${token}`, // <-- ADD THIS LINE
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enableFeature: newState, // The data you are sending to the backend
+        }),
+      });
+
+      if (!response.ok) {
+        // If the response status is not 2xx, throw an error
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Success notification after successful backend update
+      if (newState) {
+        // MODIFIED SUCCESS MESSAGE
+        toast.success("Toggle feature **activated** and saved!", {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      } else {
+        // MODIFIED INFO MESSAGE
+        toast.info("Toggle feature **deactivated** and saved!", {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+
+    } catch (error) {
+      console.error("Failed to update feature state on backend:", error);
+
+      // Revert the UI state on failure to synchronize with the backend
+      setEnableFeature(!newState);
+
+      // Show an error notification
+      // MODIFIED ERROR MESSAGE for clarity
+      toast.error("Failed to save changes for the toggle feature. Please try again.", {
+        position: "top-right",
+        autoClose: 5000,
+      });
+    }
+  };
 
   useEffect(() => {
     if (submissions.length === 0) return;
@@ -110,7 +220,6 @@ const Dashboard = () => {
     }
   };
 
-  // Group by family name
   const families = useMemo(() => {
     return submissions.reduce((acc, submission) => {
       const familyName = submission.familyName || "Unknown Family";
@@ -122,7 +231,6 @@ const Dashboard = () => {
     }, {});
   }, [submissions]);
 
-  // Family list with sorting
   const familyList = useMemo(() => {
     return Object.entries(families)
       .map(([familyName, members]) => ({
@@ -136,24 +244,20 @@ const Dashboard = () => {
       .sort((a, b) => b.memberCount - a.memberCount);
   }, [families]);
 
-  // Get liturgical rite statistics
   const riteStats = useMemo(() => {
     const riteCounts = {};
     submissions.forEach(submission => {
       const rite = submission.rite || "Unknown";
       riteCounts[rite] = (riteCounts[rite] || 0) + 1;
     });
-    
-    // Convert to array and sort by count
+
     return Object.entries(riteCounts)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [submissions]);
 
-  // Get unique rites for filter
   const uniqueRites = [...new Set(submissions.map(s => s.rite).filter(Boolean))].sort();
 
-  // Filtered family list based on search
   const filteredFamilyList = useMemo(() => {
     if (!familySearch.trim()) return familyList;
     const searchTerm = familySearch.toLowerCase();
@@ -169,12 +273,10 @@ const Dashboard = () => {
     });
   }, [familyList, familySearch]);
 
-  // Filter submissions based on selected filters
   const filteredSubmissions = submissions.filter((s) => {
     const today = new Date();
     const age = today.getFullYear() - new Date(s.dob).getFullYear();
-    
-    // Marital status filter
+
     let maritalMatch = true;
     switch (filter) {
       case "married": maritalMatch = s.marriage; break;
@@ -184,17 +286,15 @@ const Dashboard = () => {
       case "old": maritalMatch = age >= 60; break;
       default: maritalMatch = true;
     }
-    
-    // Rite filter
+
     let riteMatch = true;
     if (riteFilter !== "all") {
       riteMatch = s.rite === riteFilter;
     }
-    
+
     return maritalMatch && riteMatch;
   });
 
-  // Filtered people based on search
   const searchedPeople = useMemo(() => {
     if (!peopleSearch.trim()) return filteredSubmissions;
     const searchTerm = peopleSearch.toLowerCase();
@@ -203,10 +303,10 @@ const Dashboard = () => {
       const surname = person.surname || "";
       const phone = person.phone || "";
       const parish = person.parish || "";
-      return name.toLowerCase().includes(searchTerm) || 
-             surname.toLowerCase().includes(searchTerm) || 
-             phone.toLowerCase().includes(searchTerm) || 
-             parish.toLowerCase().includes(searchTerm);
+      return name.toLowerCase().includes(searchTerm) ||
+        surname.toLowerCase().includes(searchTerm) ||
+        phone.toLowerCase().includes(searchTerm) ||
+        parish.toLowerCase().includes(searchTerm);
     });
   }, [filteredSubmissions, peopleSearch]);
 
@@ -274,16 +374,41 @@ const Dashboard = () => {
                 Welcome, <span className="text-teal-700 font-semibold">{user?.role || "Administrator"}</span>
               </p>
               <p className="text-sm text-gray-500 mt-1">
-                Total Records: <span className="font-semibold">{submissions.length}</span> submissions | 
-                Families: <span className="font-semibold">{familyList.length}</span> | 
+                Total Records: <span className="font-semibold">{submissions.length}</span> submissions |
+                Families: <span className="font-semibold">{familyList.length}</span> |
                 Liturgical Rites: <span className="font-semibold">{riteStats.length}</span>
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleToggleFeature}
+                className={`flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition ${enableFeature
+                  ? "bg-gradient-to-r from-teal-600 to-teal-500 text-white shadow-md hover:from-teal-700 hover:to-teal-600"
+                  : "bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 hover:from-gray-300 hover:to-gray-400"
+                  }`}
+              >
+                {enableFeature ? (
+                  <>
+                    <FaToggleOn className="text-xl" />
+                    <span>Enabled</span>
+                  </>
+                ) : (
+                  <>
+                    <FaToggleOff className="text-xl" />
+                    <span>Disabled</span>
+                  </>
+                )}
+              </button>
+
               <button
                 className="px-4 py-2 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition flex items-center gap-2 shadow"
               >
                 Welcome
+              </button>
+              <button
+                className="px-4 py-2 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition flex items-center gap-2 shadow"
+                onClick={() => navigate("/reset")}>
+                Reset
               </button>
               <button
                 onClick={handleLogout}
@@ -296,6 +421,8 @@ const Dashboard = () => {
               </button>
             </div>
           </div>
+
+
         </div>
       </div>
 
@@ -303,7 +430,6 @@ const Dashboard = () => {
       <div className="w-full max-w-7xl mx-auto mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Search People */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <FaSearch className="text-teal-600" />
@@ -332,7 +458,6 @@ const Dashboard = () => {
               </p>
             </div>
 
-            {/* Search Families */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <FaHome className="text-teal-600" />
@@ -369,9 +494,8 @@ const Dashboard = () => {
         {statCards.map((stat) => (
           <div
             key={stat.key}
-            className={`${stat.bg} p-5 rounded-xl shadow-lg border border-white cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-1 ${
-              filter === stat.key ? "ring-2 ring-teal-500" : ""
-            }`}
+            className={`${stat.bg} p-5 rounded-xl shadow-lg border border-white cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-1 ${filter === stat.key ? "ring-2 ring-teal-500" : ""
+              }`}
             onClick={() => setFilter(stat.key)}
           >
             <div className="flex items-center justify-between">
@@ -479,9 +603,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Charts Section - Now 3 columns */}
+      {/* Charts Section */}
       <div className="w-full max-w-7xl mx-auto grid md:grid-cols-3 gap-8 mb-8">
-        {/* Demographic Distribution */}
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200 md:col-span-1">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center">
@@ -506,7 +629,7 @@ const Dashboard = () => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip 
+              <Tooltip
                 formatter={(value) => [value, "Count"]}
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
               />
@@ -515,7 +638,6 @@ const Dashboard = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Category Comparison */}
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200 md:col-span-1">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -527,32 +649,31 @@ const Dashboard = () => {
           </div>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={barData}>
-              <XAxis 
-                dataKey="name" 
-                stroke="#6b7280" 
+              <XAxis
+                dataKey="name"
+                stroke="#6b7280"
                 fontSize={11}
                 angle={-45}
                 textAnchor="end"
                 height={60}
               />
-              <YAxis 
+              <YAxis
                 stroke="#6b7280"
                 fontSize={11}
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(value) => [value, "Count"]}
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
               />
-              <Bar 
-                dataKey="value" 
-                fill="#0d9488" 
+              <Bar
+                dataKey="value"
+                fill="#0d9488"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Liturgical Rite Distribution */}
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200 md:col-span-1">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
@@ -570,24 +691,24 @@ const Dashboard = () => {
                 data={riteStats}
                 margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
               >
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#6b7280" 
+                <XAxis
+                  dataKey="name"
+                  stroke="#6b7280"
                   fontSize={11}
                   angle={-45}
                   textAnchor="end"
                   height={60}
                 />
-                <YAxis 
+                <YAxis
                   stroke="#6b7280"
                   fontSize={11}
                 />
-                <Tooltip 
+                <Tooltip
                   formatter={(value) => [value, "Members"]}
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                 />
-                <Bar 
-                  dataKey="value" 
+                <Bar
+                  dataKey="value"
                   fill="#8b5cf6"
                   radius={[4, 4, 0, 0]}
                   name="Members"
@@ -714,8 +835,8 @@ const Dashboard = () => {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No members found</h3>
               <p className="text-gray-600">
-                {peopleSearch || filter !== 'all' || riteFilter !== 'all' 
-                  ? `No members match the selected filters.` 
+                {peopleSearch || filter !== 'all' || riteFilter !== 'all'
+                  ? `No members match the selected filters.`
                   : "No members in the registry yet."}
               </p>
               {(peopleSearch || filter !== 'all' || riteFilter !== 'all') && (
@@ -754,7 +875,7 @@ const Dashboard = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 
+                          <h3
                             className="font-bold text-gray-900 text-lg truncate cursor-pointer hover:text-teal-700"
                             onClick={() => viewMemberDetails(s)}
                           >
@@ -809,7 +930,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Rest of the component remains the same (Family Members Modal, Member Details Modal, Delete Confirmation Modal) */}
       {/* Family Members Modal */}
       {showFamilyModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
@@ -825,8 +945,8 @@ const Dashboard = () => {
                       {selectedFamily ? selectedFamily.familyName : "All Families"}
                     </h2>
                     <p className="text-gray-600">
-                      {selectedFamily 
-                        ? `${selectedFamily.memberCount} family members` 
+                      {selectedFamily
+                        ? `${selectedFamily.memberCount} family members`
                         : `${filteredFamilyList.length} families registered`
                       }
                     </p>
@@ -857,8 +977,8 @@ const Dashboard = () => {
                   </div>
                   <div className="space-y-3">
                     {family.members.map((member, idx) => (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm cursor-pointer hover:bg-gray-50 transition"
                         onClick={() => viewMemberDetails(member)}
                       >
@@ -872,12 +992,11 @@ const Dashboard = () => {
                         <div className="flex-1">
                           <div className="flex justify-between items-center">
                             <h4 className="font-medium text-gray-900">{member.name} {member.surname}</h4>
-                            <span className={`text-xs px-2 py-1 rounded ${
-                              member.role === 'father' ? 'bg-blue-100 text-blue-700' :
+                            <span className={`text-xs px-2 py-1 rounded ${member.role === 'father' ? 'bg-blue-100 text-blue-700' :
                               member.role === 'mother' ? 'bg-pink-100 text-pink-700' :
-                              member.role === 'child' ? 'bg-green-100 text-green-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
+                                member.role === 'child' ? 'bg-green-100 text-green-700' :
+                                  'bg-gray-100 text-gray-700'
+                              }`}>
                               {member.role || 'member'}
                             </span>
                           </div>
@@ -926,12 +1045,11 @@ const Dashboard = () => {
                   </h2>
                   <p className="text-gray-600">{selectedMember.familyName}</p>
                   <div className="flex gap-2 mt-2">
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      selectedMember.role === 'father' ? 'bg-blue-100 text-blue-700' :
+                    <span className={`text-xs px-2 py-1 rounded ${selectedMember.role === 'father' ? 'bg-blue-100 text-blue-700' :
                       selectedMember.role === 'mother' ? 'bg-pink-100 text-pink-700' :
-                      selectedMember.role === 'child' ? 'bg-green-100 text-green-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
+                        selectedMember.role === 'child' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                      }`}>
                       {selectedMember.role || 'member'}
                     </span>
                     <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded">
@@ -1035,9 +1153,8 @@ const Dashboard = () => {
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className={`flex-1 px-4 py-2.5 text-white font-medium rounded-lg transition flex items-center justify-center gap-2 ${
-                  deleting ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
-                }`}
+                className={`flex-1 px-4 py-2.5 text-white font-medium rounded-lg transition flex items-center justify-center gap-2 ${deleting ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
+                  }`}
               >
                 {deleting ? (
                   <>

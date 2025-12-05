@@ -54,5 +54,7 @@ app.use("/api/user", user);
 // ✅ Example route
 app.get("/", (req, res) => res.send("API is running on Vercel 🚀"));
 
+//app.listen(5000, () => console.log('Server is running on port 5000'));
+
 // ✅ EXPORT THE EXPRESS APP (CRUCIAL for Vercel)
 export default app;

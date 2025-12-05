@@ -4,7 +4,7 @@ import { CloudinaryStorage } from "multer-storage-cloudinary";
 import cloudinary from "./cloudinary.js"; // Import your configured Cloudinary instance
 
 import { signupAndEnroll, userLogin, userUpdate } from "./formController.js";
-import protect from "./auth.js";
+import {protect} from "./auth.js";
 
 const user = express.Router();
 

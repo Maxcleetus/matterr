@@ -6,6 +6,10 @@ import cloudinary from "./cloudinary.js"; // Adjust path as necessary
 import Submission from "./Submission.js"; // Adjust path as necessary
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import Toggle from "./toogle.js";
+
+
+const SALT_ROUNDS = 10; 
 
 // --- Utility Function (JWT Token Generation) ---
 const generateToken = (id) => {
@@ -97,6 +101,57 @@ export const signupAndEnroll = async (req, res) => {
         
         res.status(500).json({ success: false, error: error.message });
     }
+};
+
+
+
+
+export const updatePassword = async (req, res) => {
+  // 1. Get data from the request body
+  const { email, password } = req.body;
+
+  // Basic input validation
+  if (!email || !password) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Email and new password are required.' 
+    });
+  }
+
+  try {
+    // 2. Find the user by email
+    const user = await Submission.findOne({ email });
+
+    if (!user) {
+      // Return a generic error message for security (don't confirm if email exists)
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found or credentials invalid.' 
+      });
+    }
+
+    // 3. Hash the new password securely
+    // This is crucial for protecting user data in the database
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // 4. Update the user's password field
+    user.password = hashedPassword;
+    await user.save(); // Save the updated user document
+
+    // 5. Send Success Response
+    return res.status(200).json({
+      success: true,
+      message: 'Password updated successfully.',
+    });
+
+  } catch (error) {
+    console.error('Password update error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error: Could not update password.',
+      error: error.message
+    });
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -259,4 +314,92 @@ export const deleteSubmission = async (req, res) => {
         console.error("❌ Delete Error:", error);
         res.status(500).json({ success: false, error: error.message });
     }
+};
+
+
+// Assume 'Toggle' is imported (e.g., import Toggle from './models/Toggle.js';)
+
+export const toogle = async (req, res) => {
+  const { enableFeature } = req.body;
+  
+  // Input Validation
+  if (typeof enableFeature !== 'boolean') {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Invalid input: enableFeature must be a boolean.' 
+    });
+  }
+
+  try {
+    // 1. Database Update Logic
+    const uniqueToggleName = "globalFeatureToggle"; 
+    
+    // Find the single settings document and update the 'toggle' field
+    const updatedToggle = await Toggle.findOneAndUpdate(
+      { name: uniqueToggleName }, // Find criteria: using the unique name
+      { toggle: enableFeature },  // Data to update
+      { 
+        new: true, // Return the updated document
+        upsert: true, // Create the document if it doesn't exist
+      }
+    );
+    
+    // Safety check: ensure the operation actually returned a document
+    if (!updatedToggle) {
+      // This should rarely happen with upsert:true, but serves as a safeguard.
+      throw new Error("Database operation failed: document not returned.");
+    }
+    
+    // 2. Success Response Logic
+    const action = updatedToggle.toggle ? "activated" : "deactivated";
+
+    return res.status(200).json({
+      success: true,
+      message: `Toggle feature successfully ${action}.`,
+      newState: updatedToggle.toggle 
+    });
+
+  } catch (error) {
+    // 3. Error Handling Logic
+    console.error('Database update error for /toggle-feature:', error);
+    
+    // Send a 500 status for any server/database error
+    return res.status(500).json({
+      success: false,
+      message: 'Server error: Could not save toggle state to database.',
+      error: error.message // Optionally send a cleaner error message
+    });
+  }
+};
+
+// Assume Toggle model is imported
+// import Toggle from '../models/Toggle.js'; 
+
+export const getToggleState = async (req, res) => {
+  try {
+    const uniqueToggleName = "globalFeatureToggle"; 
+    
+    // 1. Find the single settings document
+    const currentToggle = await Toggle.findOne({ name: uniqueToggleName });
+
+    let currentState = false;
+
+    if (currentToggle) {
+        currentState = currentToggle.toggle;
+    }
+    // If not found, it defaults to false, which is safe.
+    
+    // 2. Send the current state
+    return res.status(200).json({
+      success: true,
+      currentToggleState: currentState 
+    });
+
+  } catch (error) {
+    console.error('Database read error for /toggle-feature:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error: Could not retrieve toggle state.',
+    });
+  }
 };
