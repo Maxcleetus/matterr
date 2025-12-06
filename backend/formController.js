@@ -21,89 +21,160 @@ const generateToken = (id) => {
 
 // -----------------------------------------------------------------------------
 // 1. SIGNUP AND ENROLLMENT
-// -----------------------------------------------------------------------------
+
+
 export const signupAndEnroll = async (req, res) => {
-    try {
-        const {
-            name, surname, familyName, email, password, dob, baptism,
-            confirmation, occupation, status, phone, father, rite, role
-            // Optional fields are also in req.body
-        } = req.body;
+  
+  
+  try {
+    
+    const {
+      name, surname, familyName, email, password, dob, baptism,
+      confirmation, occupation, status, phone, father, rite, role,
+      parishOrigin = "",
+      dioceseOrigin = "",
+      parish = "",
+      diocese = "",
+      presentPlace = "",
+      marriage = "",
+      mother = "",
+      photo // This is now a base64 string
+    } = req.body;
 
-        // --- 1. Basic Validation ---
-        if (!req.file) {
-            return res.status(400).json({ success: false, error: "Photo file is required for enrollment." });
-        }
+    // --- 1. Validate required fields ---
+    const requiredFields = {
+      name, surname, familyName, email, password, dob, baptism,
+      confirmation, occupation, status, phone, father, rite, role, photo
+    };
 
-        const requiredFields = {
-            name, surname, familyName, email, password, dob, baptism,
-            confirmation, occupation, status, phone, father, rite, role
-        };
-
-        for (const [key, value] of Object.entries(requiredFields)) {
-            if (!value) {
-                fs.unlinkSync(req.file.path);
-                return res.status(400).json({ success: false, error: `Missing required field: ${key}` });
-            }
-        }
-
-        // --- 2. Check if user already exists ---
-        const existingUser = await Submission.findOne({ email });
-        if (existingUser) {
-            fs.unlinkSync(req.file.path);
-            return res.status(409).json({ success: false, message: "Account already exists with this email." });
-        }
-
-        // --- 3. Process Credentials ---
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        // --- 4. Upload Image to Cloudinary ---
-        const result = await cloudinary.uploader.upload(req.file.path, {
-            folder: "my_app/enrollments",
-        });
-
-        // --- 5. Delete temporary local file ---
-        fs.unlinkSync(req.file.path);
-
-        // --- 6. Create final data object ---
-        const submissionData = {
-            ...req.body,
-            password: hashedPassword, // Store hashed password
-            photo: result.secure_url,
-            public_id: result.public_id,
-        };
-
-        // --- 7. Save to MongoDB ---
-        const newUser = new Submission(submissionData);
-        await newUser.save();
-
-        console.log("✅ New Enrollment & User Created:", newUser.email);
-
-        // --- 8. Generate Token & Prepare Response Data ---
-        const token = generateToken(newUser._id);
-        const { password: _, public_id: __, ...userData } = newUser.toObject();
-
-        res.status(201).json({
-            success: true,
-            message: "Account created and enrollment submitted successfully.",
-            token,
-            userData,
-        });
-
-    } catch (error) {
-        console.error("❌ Sign Up/Enrollment Error:", error);
-        
-        // Clean up local file on error
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
-        
-        res.status(500).json({ success: false, error: error.message });
+    const missingFields = [];
+    for (const [key, value] of Object.entries(requiredFields)) {
+      if (!value || value.toString().trim() === "") {
+        missingFields.push(key);
+      }
     }
+
+    if (missingFields.length > 0) {
+      console.error("Missing required fields:", missingFields);
+      return res.status(400).json({
+        success: false,
+        error: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
+
+    // --- 2. Validate email format ---
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email format"
+      });
+    }
+
+    // --- 3. Check if user exists ---
+    const existingUser = await Submission.findOne({ email: email.trim().toLowerCase() });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "Account already exists with this email."
+      });
+    }
+
+    // --- 4. Hash password ---
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // --- 5. Upload photo to Cloudinary from base64 ---
+    let cloudinaryResult = null;
+    try {
+      
+      // Remove the data:image/...;base64, prefix if present
+      const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+      
+      cloudinaryResult = await cloudinary.uploader.upload(
+        `data:image/jpeg;base64,${base64Data}`, // Re-add the prefix for Cloudinary
+        {
+          folder: 'user-profile-photos',
+          transformation: [
+            { width: 500, height: 500, crop: 'limit' },
+            { quality: 'auto:good' }
+          ]
+        }
+      );
+    } catch (cloudinaryError) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to upload image. Please try again.",
+        details: process.env.NODE_ENV === 'development' ? cloudinaryError.message : undefined
+      });
+    }
+
+    // --- 6. Prepare user data ---
+    const userData = {
+      name: name.trim(),
+      surname: surname.trim(),
+      familyName: familyName.trim().toUpperCase(),
+      email: email.trim().toLowerCase(),
+      password: hashedPassword,
+      dob,
+      baptism,
+      confirmation,
+      marriage: marriage || "",
+      occupation: occupation.trim(),
+      status,
+      phone: phone.trim(),
+      father: father.trim(),
+      mother: mother ? mother.trim() : "",
+      rite,
+      role,
+      parishOrigin: parishOrigin ? parishOrigin.trim() : "",
+      dioceseOrigin: dioceseOrigin ? dioceseOrigin.trim() : "",
+      parish: parish ? parish.trim() : "",
+      diocese: diocese ? diocese.trim() : "",
+      presentPlace: presentPlace ? presentPlace.trim() : "",
+      photo: cloudinaryResult.secure_url,
+      public_id: cloudinaryResult.public_id,
+    };
+
+
+    // --- 7. Save to database ---
+    const newUser = new Submission(userData);
+    await newUser.save();
+    
+   
+
+    // --- 8. Generate response ---
+    const token = generateToken(newUser._id);
+    const { password: _, public_id: __, ...userDataForResponse } = newUser.toObject();
+
+    res.status(201).json({
+      success: true,
+      message: "Account created and enrollment submitted successfully.",
+      token,
+      userData: userDataForResponse,
+    });
+
+  } catch (error) {
+    
+    
+    let errorMessage = "Internal server error. Please try again later.";
+    let statusCode = 500;
+    
+    if (error.name === 'ValidationError') {
+      errorMessage = `Validation error: ${Object.values(error.errors).map(e => e.message).join(', ')}`;
+      statusCode = 400;
+    } else if (error.name === 'MongoError' && error.code === 11000) {
+      errorMessage = "Duplicate email. User already exists.";
+      statusCode = 409;
+    }
+    
+    res.status(statusCode).json({
+      success: false,
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 };
-
-
 
 
 export const updatePassword = async (req, res) => {
@@ -145,7 +216,6 @@ export const updatePassword = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Password update error:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error: Could not update password.',
@@ -242,7 +312,6 @@ export const userUpdate = async (req, res) => {
         // --- 3. Prepare Response Data ---
         const { password: _, public_id: __, ...userData } = updatedUser.toObject();
 
-        console.log("✅ User Profile Updated:", updatedUser.email);
         
         res.json({
             success: true,

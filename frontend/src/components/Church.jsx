@@ -263,135 +263,205 @@ const Church = ({ onAuthSuccess }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    let requiredFields = ["email", "password"];
-    let submitAction = mode === 'signup' ? "Account Creation" : "Login";
+  let requiredFields = ["email", "password"];
+  let submitAction = mode === 'signup' ? "Account Creation" : "Login";
 
-    if (mode === 'signup') {
-        requiredFields = [
-            ...requiredFields, 
-            "name", "surname", "familyName",
-            "dob", "baptism", 
-            "confirmation", "occupation", "status", "phone", 
-            "father", "rite", "role"
-        ];
+  if (mode === 'signup') {
+    requiredFields = [
+      ...requiredFields, 
+      "name", "surname", "familyName",
+      "dob", "baptism", 
+      "confirmation", "occupation", "status", "phone", 
+      "father", "rite", "role"
+    ];
+  }
+  
+  const labelMapping = {
+    name: "Name", surname: "Surname", familyName: "Family Name", 
+    email: "Email", password: "Password",
+    dob: "Date of Birth", baptism: "Date of Baptism", confirmation: "Date of Confirmation", 
+    occupation: "Occupation", status: "Marital Status", phone: "Phone Number", 
+    father: "Father's Name", rite: "Rite", role: "Role in Family"
+  };
+  
+  // --- Validation ---
+  for (const field of requiredFields) {
+    if (!form[field]) {
+      toast.error(`Required field: ${labelMapping[field]} is missing.`);
+      return;
     }
-    
-    // ... (Validation and Field Mapping logic as previously defined) ...
-    const labelMapping = {
-      name: "Name", surname: "Surname", familyName: "Family Name", 
-      email: "Email", password: "Password",
-      dob: "Date of Birth", baptism: "Date of Baptism", confirmation: "Date of Confirmation", 
-      occupation: "Occupation", status: "Marital Status", phone: "Phone Number", 
-      father: "Father's Name", rite: "Rite", role: "Role in Family"
-    };
-    
-    // --- Validation ---
-    for (const field of requiredFields) {
-      if (!form[field]) {
-        toast.error(`Required field: ${labelMapping[field]} is missing.`);
-        return;
-      }
-    }
+  }
 
-    if (mode === 'signup') {
-        if (!form.photo) {
-          toast.error("Please upload a photograph.");
-          return;
-        }
-        if (form.password.length < 6) {
-            toast.error("Password must be at least 6 characters long for sign up.");
-            return;
-        }
+  if (mode === 'signup') {
+    if (!form.photo) {
+      toast.error("Please upload a photograph.");
+      return;
     }
-    // ------------------
+    if (form.password.length < 6) {
+      toast.error("Password must be at least 6 characters long for sign up.");
+      return;
+    }
+  }
+  
+  // --- API Configuration ---
+  const BASE_URL = "http://localhost:5000/api/user";
+  const ENDPOINT = `${BASE_URL}/${mode}`; 
+  
+  try {
+    setLoading(true);
     
-    // --- API Configuration ---
-    const BASE_URL = "https://jinto-backend.vercel.app/api/user";
-    const ENDPOINT = `${BASE_URL}/${mode}`; 
-    
-    // Data preparation
     let requestData;
     let headers = {};
 
     if (mode === 'login') {
-        requestData = {
-            email: form.email,
-            password: form.password
-        };
-        headers['Content-Type'] = 'application/json';
+      requestData = {
+        email: form.email,
+        password: form.password
+      };
+      headers['Content-Type'] = 'application/json';
     } else {
-        requestData = new FormData();
-        Object.entries(form).forEach(([key, value]) => {
-            if (key !== "photo" && value) {
-                requestData.append(key, value);
-            }
-        });
-        if (form.photo) {
-            requestData.append("photo", form.photo);
-        }
-    }
-    // -------------------------
-
-    try {
-      setLoading(true);
-
-      const response = await fetch(ENDPOINT, {
-          method: 'POST',
-          body: mode === 'login' ? JSON.stringify(requestData) : requestData,
-          headers: headers, 
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-          throw new Error(result.message || `API error: ${response.statusText}`);
-      }
-
-      // ** --- DATA STORAGE & REDIRECTION LOGIC --- **
-      if (mode === 'login') {
-          toast.success("Login successful! Welcome back.");
-          
-          const userDetails = result.user || result.userData || {}; // Get user object from server response
-          
-          // 1. Store Token in Local Storage
-          if (result.token) {
-              localStorage.setItem('userToken', result.token);
-          }
-          
-          // 2. Store User Data (This is the persistence step!)
-          // Ensure all necessary fields (e.g., name, email, etc.) are included in userDetails
-          localStorage.setItem('userData', JSON.stringify(userDetails));
-
-          // 3. Trigger Redirection to Home component
-          if (onAuthSuccess) {
-              onAuthSuccess(userDetails, result.token); 
-          }
-          
-      } else { // Signup success
-          toast.success("Account created successfully! Please log in.");
-          // Auto-switch to login mode after successful signup
-          setMode('login'); 
-      }
-      // ** ----------------------------------------- **
+      // For signup, convert image to base64
+      const base64Image = await convertImageToBase64(form.photo);
       
-      // Reset password/photo
-      setForm(prevForm => ({
-        ...prevForm,
-        password: "",
-        ...(mode === 'signup' ? { photo: null } : {})
-      }));
-
-    } catch (error) {
-      console.error(`❌ ${submitAction} error:`, error.message);
-      toast.error(`${submitAction} failed. ${error.message}`);
-    } finally {
-      setLoading(false);
+      requestData = {
+        name: form.name,
+        surname: form.surname,
+        familyName: form.familyName,
+        email: form.email,
+        password: form.password,
+        dob: form.dob,
+        baptism: form.baptism,
+        confirmation: form.confirmation,
+        marriage: form.marriage || "",
+        occupation: form.occupation,
+        status: form.status,
+        phone: form.phone,
+        father: form.father,
+        mother: form.mother || "",
+        rite: form.rite,
+        role: form.role,
+        parishOrigin: form.parishOrigin || "",
+        dioceseOrigin: form.dioceseOrigin || "",
+        parish: form.parish || "",
+        diocese: form.diocese || "",
+        presentPlace: form.presentPlace || "",
+        photo: base64Image // Base64 string
+      };
+      
+      headers['Content-Type'] = 'application/json';
     }
-  };
+    
+    console.log("📤 Sending request to:", ENDPOINT);
+    console.log("Request data:", mode === 'signup' ? {
+      ...requestData,
+      photo: requestData.photo ? `Base64 (${requestData.photo.length} chars)` : 'No photo'
+    } : { email: requestData.email, password: '[HIDDEN]' });
 
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      body: JSON.stringify(requestData),
+      headers: headers, 
+    });
 
+    // Check if response is JSON
+    const contentType = response.headers.get("content-type");
+    let result;
+    
+    if (contentType && contentType.includes("application/json")) {
+      result = await response.json();
+    } else {
+      // Handle non-JSON response (server error page, etc.)
+      const text = await response.text();
+      console.error("Non-JSON response:", text.substring(0, 200));
+      throw new Error(`Server returned: ${text.substring(0, 100)}`);
+    }
+
+    if (!response.ok) {
+      console.error('Server Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: result
+      });
+      
+      const errorMessage = result.message || 
+                          result.error || 
+                          `Server error (${response.status}): ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    // ** --- DATA STORAGE & REDIRECTION LOGIC --- **
+    if (mode === 'login') {
+      toast.success("Login successful! Welcome back.");
+      
+      const userDetails = result.user || result.userData || {};
+      
+      // 1. Store Token in Local Storage
+      if (result.token) {
+        localStorage.setItem('userToken', result.token);
+      }
+      
+      // 2. Store User Data
+      localStorage.setItem('userData', JSON.stringify(userDetails));
+
+      // 3. Trigger Redirection to Home component
+      if (onAuthSuccess) {
+        onAuthSuccess(userDetails, result.token); 
+      }
+      
+    } else { // Signup success
+      toast.success("Account created successfully! Please log in.");
+      // Auto-switch to login mode after successful signup
+      setMode('login'); 
+    }
+    
+    // Reset password/photo
+    setForm(prevForm => ({
+      ...prevForm,
+      password: "",
+      ...(mode === 'signup' ? { photo: null } : {})
+    }));
+
+  } catch (error) {
+    console.error(`❌ ${submitAction} error:`, error.message);
+    console.error("Error details:", error);
+    
+    let userMessage = error.message;
+    if (error.message.includes('500')) {
+      userMessage = 'Server error. Please try again later or contact support.';
+    } else if (error.message.includes('Network Error')) {
+      userMessage = 'Network error. Please check your connection.';
+    } else if (error.message.includes('Unexpected token')) {
+      userMessage = 'Server returned an invalid response. Please try again.';
+    }
+    
+    toast.error(`${submitAction} failed. ${userMessage}`);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Helper function to convert image file to base64
+const convertImageToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    reader.onload = () => {
+      resolve(reader.result); // This is the base64 string
+    };
+    
+    reader.onerror = (error) => {
+      reject(new Error('Failed to convert image to base64: ' + error));
+    };
+  });
+};
   const isSignUpMode = mode === 'signup';
   const headerTitle = isSignUpMode ? "Official Account Creation & Enrollment" : "Member Login";
   const headerSubtitle = isSignUpMode ? "Create your user account and complete your official enrollment." : "Enter your registered credentials to access your account.";
